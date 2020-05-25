@@ -1,0 +1,13 @@
+venv
+build
+clean_venv
+.vscode
+__pycache__
+dest
+face_recognition_models
+scipy
+origin
+saved_models
+temp_models
+*.json
+dist
