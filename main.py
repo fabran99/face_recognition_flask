@@ -1,5 +1,5 @@
 import sys
-from os import listdir, mkdir
+from os import listdir, mkdir, remove
 from os.path import isfile, join, splitext, isdir
 import face_recognition
 from shutil import copyfile, rmtree, move
@@ -11,13 +11,13 @@ import base64
 import re
 
 # Custom functions
-from helpers import isImage, createModelsFolders, imgToB64, cleanTempFiles, sendMsg
+from helpers import isImage, createModelsFolders, resize_img, cleanTempFiles, sendMsg
 # Custom variables
 from variables import temp_config_json, saved_config_json, face_distance_tolerance
 
 # routes
-from variables import temp_originals_route, temp_models_route, temp_box_route
-from variables import saved_originals_route, saved_models_route, saved_box_route
+from variables import temp_models_route, temp_box_route
+from variables import saved_models_route, saved_box_route
 
 # Si no existen, creo las carpetas necesarias
 createModelsFolders()
@@ -55,15 +55,12 @@ class AppHandler:
         for (top, right, bottom, left), face_encoding in zip(face_locations, face_encondings):
             uid = str(uuid.uuid4())
 
+            # Recorto la imagen
             pil_image = Image.fromarray(img_load)
-            draw = ImageDraw.Draw(pil_image)
-            # Draw box
-            draw.rectangle(((left, top), (right, bottom)),
-                           outline=(255, 0, 0), width=5)
+            pil_image = pil_image.crop((left, top, right, bottom))
+            pil_image = resize_img(pil_image)
 
-            # Salvo modelo, imagen original y editada
-            original_img_route = join(
-                temp_originals_route, "{}.png".format(uid))
+            # Salvo modelo, y la imagen editada
             box_img_route = join(
                 temp_box_route, "{}.png".format(uid))
             img_model = join(temp_models_route,
@@ -75,18 +72,13 @@ class AppHandler:
 
             # Guardo imagen original y con caja
             pil_image.save(box_img_route)
-            Image.fromarray(img_load).save(original_img_route)
 
             json_data['models'].append({
                 "file_path": image_file,
-                "original_img": original_img_route,
                 "img_model": img_model,
                 "box_img": box_img_route,
                 "uuid": uid
             })
-
-            # Hago resize a la imagen y paso a base64
-            # base_64_img = imgToB64(pil_image)
 
             json_flush.append({
                 "uuid": uid,
@@ -97,15 +89,12 @@ class AppHandler:
             # salvo json
             with open(temp_config_json, 'w') as outfile:
                 json.dump(json_data, outfile, indent=4)
-            # pil_image.show()
 
             sendMsg(json_flush)
-            sys.stdout.flush()
         else:
             sendMsg({
                 "error": "No se encontraron rostros en la imagen seleccionada"
             })
-            sys.stdout.flush()
 
     def save_face_models(self):
         """
@@ -147,17 +136,14 @@ class AppHandler:
 
         # Copio los archivos
         for x in to_save_list:
-            new_original_route = join(saved_originals_route, x['uuid']+".png")
             new_model_route = join(saved_models_route, x['uuid']+".pkl")
             new_box_route = join(saved_box_route, x['uuid']+".png")
 
-            move(x['original_img'], new_original_route)
             move(x['img_model'], new_model_route)
             move(x['box_img'], new_box_route)
 
             # Agrego a la configuracion
             saved_config['models'].append({
-                "original_img": new_original_route,
                 "img_model": new_model_route,
                 "uuid": x['uuid'],
                 "box_img": new_box_route,
@@ -267,6 +253,64 @@ class AppHandler:
             saved_config = json.load(f)
 
         sendMsg(saved_config)
+
+    def delete_face(self):
+        """
+        Recibe un uuid y borra el rostro correspondiente
+        """
+        with open(saved_config_json, 'r') as f:
+            saved_config = json.load(f)
+
+        uuid = sys.argv[2]
+
+        found = False
+        final_models = []
+        for model in saved_config['models']:
+            if model['uuid'] == uuid:
+                found = True
+                remove(model['img_model'])
+                remove(model['box_img'])
+            else:
+                final_models.append(model)
+
+        # Guardo config
+        with open(saved_config_json, 'w') as outfile:
+            json.dump({"models": final_models}, outfile, indent=4)
+
+        response = {
+            "models": final_models,
+            "message": "Eliminado con exito"
+        }
+
+        sendMsg(response)
+
+    def edit_face_name(self):
+        """
+        Recibe un uuid y un nombre en json, edita la configuracion
+        que corresponda
+        """
+        with open(saved_config_json, 'r') as f:
+            saved_config = json.load(f)
+
+        new_config = json.loads(sys.argv[2])
+
+        final_models = []
+        for model in saved_config['models']:
+            if model['uuid'] == new_config['uuid']:
+                model['name'] = new_config['name']
+
+            final_models.append(model)
+
+        # Guardo config
+        with open(saved_config_json, 'w') as outfile:
+            json.dump({"models": final_models}, outfile, indent=4)
+
+        response = {
+            "models": final_models,
+            "message": "Actualizado con exito"
+        }
+
+        sendMsg(response)
 
     def execute_function(self, func):
         try:

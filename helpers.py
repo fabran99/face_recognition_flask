@@ -9,6 +9,7 @@ import json
 
 from variables import reg_extension, temp_route, saved_route, json_configs
 from variables import temp_config_json, saved_route_list, temp_route_list
+from variables import basewidth
 
 
 def cleanTempFiles():
@@ -23,15 +24,14 @@ def cleanTempFiles():
     createModelsFolders()
 
 
-def imgToB64(img):
+def resize_img(img, new_width=basewidth):
     """
-    Recibe una imagen de pillow, la redimensiona y 
-    la retorna como base64
+    Recibe una imagen de pillow y la redimensiona
     """
-    wpercent = (basewidth / float(img.size[0]))
+    wpercent = (new_width / float(img.size[0]))
     hsize = int((float(img.size[1]) * float(wpercent)))
-    resized_img = img.resize((basewidth, hsize), Image.ANTIALIAS)
-    return base64.b64encode(resized_img.tobytes())
+    resized_img = img.resize((new_width, hsize), Image.ANTIALIAS)
+    return resized_img
 
 
 def createModelsFolders():
