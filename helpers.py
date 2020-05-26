@@ -18,7 +18,7 @@ def cleanTempFiles():
     rmtree(temp_route)
     with open(temp_config_json, 'w') as outfile:
         json.dump({
-            'temporal_models': []
+            'models': []
         }, outfile, indent=4)
     createModelsFolders()
 
@@ -53,7 +53,7 @@ def createModelsFolders():
         if not isfile(x):
             with open(x, 'w') as outfile:
                 json.dump({
-                    'temporal_models': []
+                    'models': []
                 }, outfile, indent=4)
 
 

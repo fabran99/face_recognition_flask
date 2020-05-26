@@ -47,7 +47,7 @@ class AppHandler:
             img_load, face_locations)
 
         json_data = {
-            "temporal_models": []
+            "models": []
         }
 
         json_flush = []
@@ -77,7 +77,7 @@ class AppHandler:
             pil_image.save(box_img_route)
             Image.fromarray(img_load).save(original_img_route)
 
-            json_data['temporal_models'].append({
+            json_data['models'].append({
                 "file_path": image_file,
                 "original_img": original_img_route,
                 "img_model": img_model,
@@ -93,7 +93,7 @@ class AppHandler:
                 "img": box_img_route
             })
 
-        if len(json_data['temporal_models']) > 0:
+        if len(json_data['models']) > 0:
             # salvo json
             with open(temp_config_json, 'w') as outfile:
                 json.dump(json_data, outfile, indent=4)
@@ -116,21 +116,21 @@ class AppHandler:
         # Temporal config
         with open(temp_config_json, 'r') as f:
             temp_config = json.load(f)
-        temporal_models = temp_config['temporal_models']
+        models = temp_config['models']
 
         # Current config
         with open(saved_config_json, 'r') as f:
             saved_config = json.load(f)
 
         # Si no encontre nada retorno
-        if len(temporal_models) == 0:
+        if len(models) == 0:
             sendMsg({
                 "error": "No se encontraron rostros"
             })
             return
 
         to_save_list = []
-        for x in temporal_models:
+        for x in models:
             if x['uuid'] in to_save_json['uuids']:
                 # Agrego nombre seleccionado por el usuario
                 x['name'] = to_save_json['names'][to_save_json['uuids'].index(
@@ -156,7 +156,7 @@ class AppHandler:
             move(x['box_img'], new_box_route)
 
             # Agrego a la configuracion
-            saved_config['temporal_models'].append({
+            saved_config['models'].append({
                 "original_img": new_original_route,
                 "img_model": new_model_route,
                 "uuid": x['uuid'],
@@ -169,8 +169,10 @@ class AppHandler:
             json.dump(saved_config, outfile, indent=4)
 
         sendMsg({
-            "message": "Los rostros seleccionados fueron guardados"
+            "message": "Los rostros seleccionados fueron guardados",
+            "new_models": saved_config
         })
+
         # Limpio la carpeta de temporales
         cleanTempFiles()
 
@@ -204,7 +206,7 @@ class AppHandler:
             saved_config = json.load(f)
         for x in faces:
             face_info = [
-                record for record in saved_config['temporal_models'] if record['uuid'] == x]
+                record for record in saved_config['models'] if record['uuid'] == x]
             if len(face_info) != 1:
                 continue
 
