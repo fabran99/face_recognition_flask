@@ -8,6 +8,7 @@ import pickle
 from PIL import Image, ImageDraw, ImageFont
 import json
 import base64
+from time import sleep
 import re
 
 # Custom functions
@@ -129,7 +130,7 @@ class AppHandler:
         # Si no selecciono ninguno entonces limpio
         if len(to_save_list) == 0:
             sendMsg({
-                "message": "No se seleccionaron fotos"
+                "error": "No se seleccionaron fotos"
             })
             cleanTempFiles()
             return
@@ -210,13 +211,15 @@ class AppHandler:
         # Empiezo a recorrer la carpeta
         found = 0
 
+        sendMsg({
+            "message": "Iniciando proceso...",
+            "state": "Running"
+        })
+        sleep(1)
+
         for index, image in enumerate(dest_img_list):
             # Armo la ruta
             route = join(origin_route, image)
-            sendMsg({
-                "message": "Revisando {}".format(image),
-                "state": "Running"
-            })
 
             # Creo modelo
             img_load = face_recognition.load_image_file(route)
@@ -232,17 +235,21 @@ class AppHandler:
                     # Reviso distancia menor a 0.5
                     for i, face_distance in enumerate(face_distances):
                         if face_distance < face_distance_tolerance:
-                            sendMsg({
-                                "message": "Encontrado rostro seleccinonado en {}".format(image),
-                                "state": "Running"
-                            })
                             found += 1
                             dst_route = join(dest_route, image)
                             copyfile(route, dst_route)
+                            sendMsg({
+                                "message": "Encontrado rostro seleccionado en {}".format(image),
+                                "state": "Running",
+                                "img": dst_route
+                            })
+                            sleep(1)
+
                             break
                             # print(faces, dest_route, origin_route)
                             # sys.stdout.flush()
 
+        sleep(1)
         sendMsg({
             "message": "{} encontrados, finalizado con éxito.".format(found),
             "state": "Finalized"
@@ -316,7 +323,9 @@ class AppHandler:
         try:
             to_execute = getattr(self, func)
         except:
-            print("No existe la funcion")
+            sendMsg({
+                "message": "No existe la funcion"
+            })
             return
 
         to_execute()
@@ -324,4 +333,9 @@ class AppHandler:
 
 # Manejo los argumentos
 handler = AppHandler()
-handler.execute_function(sys.argv[1])
+try:
+    handler.execute_function(sys.argv[1])
+except Exception as e:
+    sendMsg({
+        "error": str(e)
+    })
